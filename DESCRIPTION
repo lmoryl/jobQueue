@@ -1,0 +1,12 @@
+Package: jobQueue
+Type: Package
+Title: Optionally blocking job queue using rredis
+Version: 1.0.0
+Date: 2013-2-21
+Author: Luke Moryl and Peter Foley, Pivotal Targeting, LLC
+Maintainer: Luke Moryl <lsmoryl@pivotaltargeting.com>
+Description: A parallel/asynchronous job queue with a Redis backend
+Depends: R (>= 2.5), rredis (>= 1.6.2), utils
+License: GPL-2
+LazyLoad: yes
+

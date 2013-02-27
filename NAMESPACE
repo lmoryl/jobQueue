@@ -1,0 +1,15 @@
+useDynLib(jobQueue)
+export(bmuuid)
+export(load.as.list)
+export(refApply)
+export(randomInt)
+export(Job)
+export(JobQueue)
+export(JobQueueRedis)
+export(makeJobQueueRedis)
+export(jqWorker)
+export(startLocalJQWorkers)
+export(sendJobs)
+
+import(rredis)
+
