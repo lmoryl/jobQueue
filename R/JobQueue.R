@@ -87,8 +87,7 @@ JobQueue = setRefClass(
 )
 
 
-#' A reference class that implements a job queue with mcparallel.
-#' Starts running jobs as soon as possible.
+#' A reference class that implements a job queue with a redis backend.
 #' 
 #' @export
 JobQueueRedis = setRefClass(
@@ -99,29 +98,48 @@ JobQueueRedis = setRefClass(
       port = "integer"
     ),
     methods = list(
-      initialize = function(host = "localhost", port = 6379,...) {
-        redisConnect(host, port)
+      initialize = function(host = "localhost", port = 6379, timeout = 67108863, ...) {
+        redisConnect(host, port,timeout=timeout)
         ##TODO: fault tolerance fork
         callSuper(...)
       },
       
       send = function(jb) {
-        jobDepends = paste(id, jb$key, 'waitingOn', sep=':')
+        jobNumDepends = paste(id, jb$key, 'numWaitingOn', sep=':')
+        jobDepends = paste(id, jb$key, 'Dependancies', sep=':')
         jobEnv = paste(id, jb$key, 'env', sep=':')
         queueWaiting = paste(id, 'waiting', sep=':')
-
-        #redisSetBlocking(FALSE)
-        redisSet(jobDepends, length(jb$dependsOn))
-        for (i in jb$dependsOn) {
-          redisSAdd(paste(id, i, 'Dependees', sep=':'), jb$key)
+        queueInProgress = paste(id, 'inProgress', sep=':')
+        queueDone = paste(id, 'done', sep=':')
+        jobsInQueue <- redisSUnion(queueWaiting, queueInProgress, queueDone)        
+        if(!jb$key %in% jobsInQueue) {
+ #         redisSetBlocking(FALSE)
+          if(length(jb$dependsOn)) {
+            for (i in jb$dependsOn) {
+              redisSAdd(jobDepends,i)
+            }
+            redisSDiffStore(jobDepends, jobDepends, queueDone)
+          } 
+  #        redisGetResponse()
+   #       redisSetBlocking(TRUE)
+          numDeps = redisSCard(jobDepends)
+          if(numDeps > 0) redisDelete(jobDepends)
+      #    redisSetBlocking(FALSE)
+          redisIncrBy(jobNumDepends, numDeps)
+          for (i in jb$dependsOn) {
+            redisSAdd(paste(id, i, 'Dependees', sep=':'), jb$key)
+          }
+          redisSet(jobEnv, jb)
+          redisSAdd(queueWaiting, jb$key)
+          redisRPush(id, jb$key)
+       #   redisGetResponse()
+        #  redisSetBlocking(TRUE)
+        } else {
+          stop('Job with this key is already in this queue.  No action taken.')
         }
-        redisSet(jobEnv, jb)
-        redisSAdd(queueWaiting, jb$key)
-        redisRPush(id, jb$key)
-        #redisSetBlocking(TRUE)
       },
      
-      getResults = function(keys = NULL) {
+      getResults = function(keys = NULL, restartFaults = TRUE, verbose=FALSE) {
         # Returns null if key is not done yet.
         if(is.null(keys)) {
           queueDone = paste(id, 'done', sep=':')
@@ -131,8 +149,11 @@ JobQueueRedis = setRefClass(
         queueOut = paste(id, keys, 'out', sep=':')
         res = lapply(queueOut, redisGet)
         names(res) = keys
+        if (length(keys) == 1) res=res[[1]]
         # Check for failed workers
-        ftcheck(id)
+        # These seem to do the exact same thing.  Need to figure out why ftcheck isn't working.
+       # ftcheck(id)
+        checkFaults(restartFaults, verbose)
         return(res)
       },
   
@@ -144,6 +165,35 @@ JobQueueRedis = setRefClass(
       getInProgress = function() {
         queueInProgress = paste(id, 'inProgress', sep=':')
         return(redisSMembers(queueInProgress))
+      },
+
+      checkFaults = function(restartFaults=TRUE, verbose=FALSE) {
+        queueStart <- paste(id,"start",sep=".")
+        queueStart <- paste(id, "*", sep="")
+        queueAlive <- paste(id,"alive",sep=".")
+        queueAlive <- paste(id, "*", sep="")
+        queueWaiting = paste(id, 'waiting', sep=':')
+        queueInProgress = paste(id, 'inProgress', sep=':')
+
+        started <- redisKeys(queueStart)
+        started <- sub(paste(id,"start","",sep="."),"",started)
+        alive <- redisKeys(queueAlive)
+        alive <- sub(paste(id,"alive","",sep="."),"",alive)
+        fault <- setdiff(started,alive)
+
+        if(length(fault) == 0 & verbose) cat('No worker faults detected.\n')
+
+        if(length(fault)>0) {
+          if(verbose) cat('faults on jobs:', fault, '\n')
+          if(restartFaults) {
+            for(resub in fault) {
+              redisSRem(queueInProgress, resub)
+              redisSAdd(queueWaiting, resub)
+              redisDelete(paste(id, 'start', resub, sep='.'))
+              redisRPush(id, resub)
+            }
+          }
+        }
       }
     )
 )
@@ -189,7 +239,7 @@ sendJobs = function(queue, jobs) {
 }
 
 #' @export
-makeJobQueueRedis = function(id = bmuuid(), host="localhost", port=6379,...) {
+makeJQRedis = function(id = bmuuid(), host="localhost", port=6379,...) {
     JobQueueRedis$new(id=id, host=host, port=port, ...)
 }
 

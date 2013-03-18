@@ -7,50 +7,53 @@
 #' @export
 Job <- setRefClass(
     Class = "Job",
-    fields = list( key = "character", 
-      envir = "list", 
+    fields = list(
+      key = "character", 
+      envir = "environment", 
       expr = "ANY", 
       packages = "character", 
       seed = "integer", 
-      dependsOn = "character",
-      .exportenv = "environment"),
+      dependsOn = "list",
+      result = "list"),
     methods = list(
       run = function() {"runs the job"
         # set the random seed
-        oldseed <- NULL
-        if(length(seed) > 0){
-          if(!exists('.Random.seed')) runif(1) # initialize the RNG if needed
-          oldseed <- .Random.seed
-          if(length(seed) == 1) {
-            set.seed(seed)
-          } else {
-            # use assign to avoid warnings about non-local assignment
-            assign('.Random.seed', oldseed, globalenv())
+        if(length(result) == 0){
+          oldseed <- NULL
+          if(length(seed) > 0){
+            if(!exists('.Random.seed')) runif(1) # initialize the RNG if needed
+            oldseed <- .Random.seed
+            if(length(seed) == 1) {
+              set.seed(seed)
+            } else {
+              # use assign to avoid warnings about non-local assignment
+              assign('.Random.seed', oldseed, globalenv())
+            }
           }
-        }
         
-        # load packages as needed
-        for(p in packages) {
-          if(dirname(p) == '.') {
-            library(package=p, character.only=T)
-          } else {
+          # load packages as needed
+          for(p in packages) {
+            if(dirname(p) == '.') {
+              library(package=p, character.only=T)
+            } else {
             library(package=basename(p), character.only=T, lib.loc=dirname(p))
+            }
           }
+        
+          # run the job
+          res <- tryCatch({
+              eval(expr = expr, envir = envir)
+            }, error = function(e) e
+          ) 
+        
+          # set the random seed back to where it was if necessary
+          if(!is.null(oldseed)) assign('.Random.seed', oldseed, globalenv())
+          result <<- list(res)
         }
-        
-        # run the job
-        result <- tryCatch({
-            eval(expr = expr, envir = list2env(envir))
-          }, error = function(e) e
-        ) 
-        
-        # set the random seed back to where it was if necessary
-        if(!is.null(oldseed)) assign('.Random.seed', oldseed, globalenv())
-        
-        return(result)
+        return(result[[1]])
       },
       
-      initialize = function(expr, envir=parent.frame(n=4), key=bmuuid(), noexport=character(), verbose=FALSE, export=character(), ...) {
+      initialize = function(expr, envir=parent.frame(n=4), key=bmuuid(), noexport=character(), dependsOn = character(), verbose=FALSE, export=character(), ...) {
 # Setup the parent environment by first attempting to create an environment
 # that has '...' defined in it with the appropriate values
         .makeDotsEnv <- function(...) {
@@ -58,33 +61,30 @@ Job <- setRefClass(
           function() NULL
         }
         # allow lists as environment arguments
-        if(is.environment(envir)){
-          envir <<- as.list(envir)
-        } else if(is.list(envir)){
+        if(is.list(envir)){
+          envir <<- list2env(envir)
+        } else if(is.environment(envir)){
           envir <<- envir
         } else {
           stop("envir must be a list or environment")
         }
         rm(envir) # ensure that it searches down to the object environment rather than hitting the function argument
-        print(unlist(envir))
         
         # set up expr
         expr <<- substitute(expr)
         rm(expr) # remove function-local version so later usage hits the object environment
 
-        ############
-#        .exportenv <<- tryCatch({
-#          qargs <- quote(list(...))
-#          args <- eval(qargs, envir)
-#          environment(do.call(.makeDotsEnv, args))
-#        },
-#        error=function(e) {
-#          new.env(parent=emptyenv())
-#        })
-        #foreach::getexports(expr, exportenv, envir, bad=noexport)
-        #exportenv = NULL
-        ############
-        vars <- names(envir)
+        .exportenv <- tryCatch({
+          qargs <- quote(list(...))
+          args <- eval(qargs, envir)
+          environment(do.call(.makeDotsEnv, args))
+        },
+        error=function(e) {
+          new.env(parent=emptyenv())
+        })
+        foreach::getexports(expr, .exportenv, envir, bad=noexport)
+
+        vars <- ls(.exportenv)
         if (verbose) {
           if (length(vars) > 0) {
             cat('automatically exporting the following objects',
@@ -95,33 +95,38 @@ Job <- setRefClass(
           }
         }
 # Compute list of variables to export
-        #ignore <- intersect(export, vars)
-        #if (length(ignore) > 0) {
-        #  warning(sprintf('already exporting objects(s): %s',
-        #          paste(ignore, collapse=', ')))
-        #  export <- setdiff(export, ignore)
-        #}
+        ignore <- intersect(export, vars)
+        if (length(ignore) > 0) {
+          warning(sprintf('already exporting objects(s): %s',
+                  paste(ignore, collapse=', ')))
+          export <- setdiff(export, ignore)
+        }
 # Add explicitly exported variables to exportenv
-        #if (length(export) > 0) {
-        #  if (verbose)
-        #    cat(sprintf('explicitly exporting objects(s): %s\n',
-        #                paste(export, collapse=', ')))
-        #  for (sym in export) {
-        #    if (!exists(sym, envir, inherits=TRUE))
-        #      stop(sprintf('unable to find variable "%s"', sym))
-        #    assign(sym, get(sym, envir, inherits=TRUE),
-        #           pos=exportenv, inherits=FALSE)
-        #  }
-        #}
-        #envir <<- exportenv
+        if (length(export) > 0) {
+          if (verbose)
+            cat(sprintf('explicitly exporting objects(s): %s\n',
+                        paste(export, collapse=', ')))
+          for (sym in export) {
+            if (!exists(sym, envir, inherits=TRUE))
+              stop(sprintf('unable to find variable "%s"', sym))
+            assign(sym, get(sym, envir, inherits=TRUE),
+                   pos=exportenv, inherits=FALSE)
+          }
+        }
+        envir <<- .exportenv
         # Danger!  Might not always work in future versions of R
-        #parent.env(envir) <<- parent.frame()
-        
+        parent.env(envir) <<- parent.frame()
+        result <<- list()
+
+        if( is.list(dependsOn) ) {
+          dependsOn <<- dependsOn
+        } else if(is.character(dependsOn)) {
+          dependsOn <<- as.list(dependsOn)
+        } else {
+          stop("dependsOn must be character or list of characters")
+        }        
+
         initFields(key=key, ...)
-      },
-      
-      depDone = function(keys) {
-        dependsOn <<- setdiff(dependsOn, keys)
       }
     )
 )
@@ -130,42 +135,27 @@ Job <- setRefClass(
 Job$accessors('key','expr','envir','dependsOn','packages')
 
 # S4-style methods for Job objects
-#' @export
-if(!isGeneric("getKey")) setGeneric(
-    name = "getKey",
-    def=function(object){standardGeneric("getKey")}
+
+if(!isGeneric("getResult")) {setGeneric("getResult", function(object) {standardGeneric("getResult")})}
+setMethod("getResult", "Job", function(object) {
+  if(length(object$result) == 0) return(NULL)
+  return(object$result[[1]])}
 )
 
-setMethod(
-  f="getKey",
-  signature = "Job",
-  definition = function(object) object$getKey()
-)
+if(!isGeneric("getKey")) {setGeneric("getKey", function(object) {standardGeneric("getKey")})}
+setMethod("getKey", "Job", function(object) object$key)
 
-#' @export
-if(!isGeneric("getDependsOn")) setGeneric(
-    name = 'getDependsOn',
-    def=function(object) {standardGeneric('getDependsOn')}
-)
+if(!isGeneric("getDependsOn")) {setGeneric("getDependsOn", function(object) {standardGeneric('getDependsOn')})}
+setMethod('getDependsOn', 'Job', function(object) object$dependsOn)
 
-setMethod(
-  f='getDependsOn',
-  signature='Job',
-  definition = function(object) object$getDependsOn()
-)
+if(!isGeneric("getEnvir")) {setGeneric("getEnvir", function(object) {standardGeneric("getEnvir")})}
+setMethod("getEnvir", "Job", function(object) object$envir)
 
-#' @export
-setGeneric(
-    name = "run",
-    def=function(object){standardGeneric("run")}
-)
+if(!isGeneric("getPackages")) {setGeneric("getPackages", function(object) {standardGeneric("getPackages")})}
+setMethod("getPackages", "Job", function(object) object$packages)
 
-setMethod(
-  f="run",
-  signature = "Job",
-  definition = function(object) object$run()
-)
-
+if(!isGeneric("run")) {setGeneric("run", function(object){standardGeneric("run")})}
+setMethod("run", "Job", function(object) object$run())
 
 
 # job that can be safely serialized and run elsewhere
@@ -178,6 +168,7 @@ setMethod(
     f = "run",
     signature = "ExternalJob",
     definition = function(object) {
+      if(is.null(result)) {
         oldseed = NULL
         for(p in object@packages) library(package=p, character.only=TRUE)
         if(length(object@seed)>0){
@@ -192,7 +183,9 @@ setMethod(
         result = list(eval(expr = object@expr, envir = object@envir))
         names(result) = object@key
         if(!is.null(oldseed)) .Random.seed = oldseed
-        return(result)
+        result <<- result
+      }
+      return(result)
     }
 )
 

@@ -23,20 +23,9 @@
 # is fraglie as this may function be dropped in a future release of R.
 #  parent.env(.jqRedisGlobals$exportenv) <- globalenv()
   tryCatch(
-    {for (p in job$packages)
+    {for (p in getPackages(job))
       library(p, character.only=TRUE)
     }, error=function(e) cat(as.character(e),'\n',file=log)
-  )
-}
-
-`.jobEvalWrapper` <- function()
-{
-  tryCatch({
-  #    lapply(names(args), function(n)
-  #                       assign(n, args[[n]], pos=.doRedisGlobals$exportenv))
-      eval(.jqRedisGlobals$job$run(), envir=.jqRedisGlobals$exportenv)
-    },
-    error=function(e) e
   )
 }
 
@@ -58,7 +47,7 @@
 
 `jqWorker` <- function(queue, host="localhost", port=6379, iter=Inf, timeout=30, log=stdout())
 {
-  redisConnect(host,port)
+  redisConnect(host,port,timeout=67108863)
   queueLive <- paste(queue,"live",sep=".")
   queueWaiting = paste(queue, 'waiting', sep=':')
   queueInProgress = paste(queue, 'inProgress', sep=':')
@@ -84,6 +73,7 @@
     if(is.null(work[[1]]))
      {
       ok <- FALSE
+      r <- redisExists(j)
       for(j in queueLive) ok <- ok || redisExists(j)
       if(!ok) {
 # If we get here, our queues were deleted. Clean up and exit worker loop.
@@ -98,8 +88,8 @@
     else
 # Cycle through job keys til one shows up that doesn't have outstanding dependencies
      {
-
-      jobDepends = paste(queue, jbkey, 'waitingOn', sep=':')
+      ok <- FALSE
+      jobDepends = paste(queue, jbkey, 'numWaitingOn', sep=':')
       numDependencies = redisGet(jobDepends)
       ##TODO: put in function to see job's dependency count.  If ever less than 0, that's a bug and shouldn't be ignored.
       if( numDependencies != 0 ) redisRPush(queue, jbkey)
@@ -111,7 +101,7 @@
         redisSRem(queueWaiting, jbkey)
         redisSAdd(queueInProgress, jbkey)
         initdata = redisGet(queueEnv);
-        .jqWorkerInit(initdata, initdata$envir, initdata$packages, log)
+        .jqWorkerInit(initdata, getEnvir(initdata), getPackages(initdata), log)
         fttag.start <- paste(queue,"start",jbkey,sep=":")
         fttag.alive <- paste(queue,"alive",jbkey,sep=":")
 # fttag.start is a permanent key
@@ -121,16 +111,26 @@
 # by fault tolerant code to resubmit the associated jobs.
         redisSet(fttag.start,1)
         .setOK(port, host, fttag.alive)
-#        result = .jobEvalWrapper()
-        result = .jqRedisGlobals$job$run()
+        result = run(.jqRedisGlobals$job)
+        jobDependeesKey = paste(queue, jbkey, 'Dependees', sep=':')
+        jobDependees = redisSMembers(jobDependeesKey)
+        redisSetBlocking(FALSE)
+        redisMulti() #Do all of this atomically
         redisSet(queueOut, result)
         redisSRem(queueInProgress, jbkey)
         redisSAdd(queueDone, jbkey)
-        redisDelete(jobDepends)
-        redisDelete(queueEnv)
+        for (i in jobDependees) {
+          depOn = paste(queue, i, 'numWaitingOn', sep=':')
+          redisDecr(depOn)
+        }
+        invisible(redisExec())
+        redisGetResponse()
+        redisSetBlocking(TRUE)
+        if(length(jobDependees)) redisDelete(jobDependeesKey)
+        tryCatch(redisDelete(jobDepends), error=function(e) invisible())
+        tryCatch(redisDelete(queueEnv), error=function(e) invisible())
 # Fault tolerance:  currently, check each time job completes for failed workers
         ftcheck(queue)
-        #redisSAdd(queueFinished, jbkey)
         tryCatch(redisDelete(fttag.start), error=function(e) invisible())
         .delOK()
       }
