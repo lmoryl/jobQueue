@@ -131,8 +131,8 @@ Job <- setRefClass(
     )
 )
 
-
-Job$accessors('key','expr','envir','dependsOn','packages')
+# Not using accessors to give more uniform syntax
+#Job$accessors('key','expr','envir','dependsOn','packages', 'result')
 
 # S4-style methods for Job objects
 
@@ -156,55 +156,4 @@ setMethod("getPackages", "Job", function(object) object$packages)
 
 if(!isGeneric("run")) {setGeneric("run", function(object){standardGeneric("run")})}
 setMethod("run", "Job", function(object) object$run())
-
-
-# job that can be safely serialized and run elsewhere
-setClass("ExternalJob",
-    representation = representation(envir = "environment", expr = "ANY", packages = "character", key = "character", seed="integer")
-)
-
-
-setMethod(
-    f = "run",
-    signature = "ExternalJob",
-    definition = function(object) {
-      if(is.null(result)) {
-        oldseed = NULL
-        for(p in object@packages) library(package=p, character.only=TRUE)
-        if(length(object@seed)>0){
-          oldseed = .Random.seed
-          if(length(object@seed)==1) {
-            set.seed(object@seed)
-          } else {
-            .Random.seed = object@seed
-          }
-        }
-        
-        result = list(eval(expr = object@expr, envir = object@envir))
-        names(result) = object@key
-        if(!is.null(oldseed)) .Random.seed = oldseed
-        result <<- result
-      }
-      return(result)
-    }
-)
-
-setMethod(
-    f="getDependsOn",
-    signature = "ExternalJob",
-    definition = function(object) object@dependsOn
-)
-
-setMethod(
-    f = "getKey",
-    signature = "ExternalJob",
-    definition = function(object) object@key
-)
-
-
-Job$methods(
-  makeExternal = function(){
-    new("ExternalJob", envir=envir, expr=expr, packages=packages, seed=seed, key=key)
-  }
-)
 

@@ -1,22 +1,30 @@
 useDynLib(jobQueue)
+
 export(bmuuid)
 export(load.as.list)
 export(refApply)
 export(randomInt)
+
+exportClass(Job)
 export(Job)
 export(getDependsOn)
 export(getEnvir)
 export(getKey)
 export(getPackages)
 export(getResult)
-export(getResults)
-export(run)
+
+exportClass(JobQueue)
 export(JobQueue)
+exportClass(JobQueueRedis)
 export(JobQueueRedis)
+export(getWaiting)
+export(getInProgress)
+export(getResults)
 export(makeJQRedis)
+#export(sendJobs)
+
 export(jqWorker)
 export(startLocalJQWorkers)
-export(sendJobs)
 
 import(rredis)
 

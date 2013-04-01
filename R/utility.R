@@ -12,37 +12,33 @@ load.as.list = function(file){
 #'
 #' @param q the queue whose workers we are checking
 #' @export
-ftcheck = function(queue) {
-if(FALSE){
-  queueStart <- paste(queue,"start", sep=":")
-  queueStart <- paste(queueStart, "*", sep="")
-  queueAlive <- paste(queue,"alive", sep=":")
-  queueAlive <- paste(queueAlive, "*", sep="")
+ftcheck = function(id, restartFaults=TRUE, verbose=FALSE) {
+  queueStart <- paste(id,"start",sep=":")
+  queueStart <- paste(queueStart, "*", sep=":")
+  queueAlive <- paste(id,"alive",sep=":")
+  queueAlive <- paste(queueAlive, "*", sep=":")
+  queueWaiting = paste(id, 'waiting', sep=':')
+  queueInProgress = paste(id, 'inProgress', sep=':')
 
-# Check for worker fault and re-submit tasks if required...
   started <- redisKeys(queueStart)
-  started <- sub(paste(queue,"start","",sep=":"),"",started)
+  started <- sub(paste(id,"start","",sep=":"),"",started)
   alive <- redisKeys(queueAlive)
-  alive <- sub(paste(queue,"alive","",sep=":"),"",alive)
+  alive <- sub(paste(id,"alive","",sep=":"),"",alive)
   fault <- setdiff(started,alive)
-  if(length(fault)>0) { 
-# One or more worker faults have occurred. Re-sumbit the work.
-#    fault <- paste(queue, "start", fault, sep=":")
-#    fjobs <- redisMGet(fault)
-#    redisDelete(fault)
-#    for(resub in fjobs) {
-#      block <- argsList[unlist(resub)]
-#      names(block) <- unlist(resub)
-#      if (obj$verbose)
-#        cat("Worker fault: resubmitting jobs", names(block), "\n")
-#      redisRPush(queue, list(ID=ID, argsList=block))
-#    }
-     redisSRem(queueInProgress, fault)
-     redisSAdd(queueWaiting, fault)
-     for(resub in fault) redisRPush(queue, resub)
+
+  if(length(fault)>0) {
+    if(verbose) cat('faults on jobs:', fault, '\n')
+    if(restartFaults) {
+      for(resub in fault) {
+        redisSRem(queueInProgress, resub)
+        redisSAdd(queueWaiting, resub)
+        redisDelete(paste(id, 'start', resub, sep=':'))
+        redisRPush(id, resub)
+      }
+    }
   }
 }
-}
+
 
 #' function to draw a random int
 randomInt = function(n) as.integer(floor(runif(n, -2^31+1, 2^31)))

@@ -29,13 +29,13 @@
   )
 }
 
-`startLocalJQWorkers` <- function(n, queue, host="localhost", port=6379, iter=Inf, timeout=60, log=stdout(), Rbin=paste(R.home(component='bin'),"R",sep="/"))
+`startLocalJQWorkers` <- function(n, queue, host="localhost", port=6379, iter=Inf, timeout=60, log=stdout(), Rbin=paste(R.home(component='bin'),"R",sep="/"), restartFaults=TRUE, verbose=TRUE)
 {
   m <- match.call()
   f <- formals()
   l <- m$log
   if(is.null(l)) l <- f$log
-  cmd <- paste("require(jobQueue);jqWorker(queue='",queue,"', host='",host,"', port=",port,", iter=",iter,", timeout=",timeout,", log=",deparse(l),")",sep="")
+  cmd <- paste("require(jobQueue);jqWorker(queue='",queue,"', host='",host,"', port=",port,", iter=",iter,", timeout=",timeout,", log=",deparse(l),", restartFaults=",restartFaults,", verbose=",verbose,")",sep="")
   j=0
   args <- c("--slave","-e",paste("\"",cmd,"\"",sep=""))
   while(j<n) {
@@ -45,10 +45,10 @@
   }
 }
 
-`jqWorker` <- function(queue, host="localhost", port=6379, iter=Inf, timeout=30, log=stdout())
+`jqWorker` <- function(queue, host="localhost", port=6379, iter=Inf, timeout=30, log=stdout(), restartFaults=TRUE, verbose=FALSE)
 {
   redisConnect(host,port,timeout=67108863)
-  queueLive <- paste(queue,"live",sep=".")
+  queueLive <- paste(queue,"live",sep=":")
   queueWaiting = paste(queue, 'waiting', sep=':')
   queueInProgress = paste(queue, 'inProgress', sep=':')
   queueDone = paste(queue, 'done', sep=':')
@@ -56,7 +56,7 @@
   {
     if(!redisExists(j)) redisSet(j,NULL)
   }
-  queueCount <- paste(queue,"count",sep=".")
+  queueCount <- paste(queue,"count",sep=":")
   for(j in queueCount)
     tryCatch(redisIncr(j),error=function(e) invisible())
   cat("Waiting for jobs from the Job Queue.\n", file=log)
@@ -130,7 +130,7 @@
         tryCatch(redisDelete(jobDepends), error=function(e) invisible())
         tryCatch(redisDelete(queueEnv), error=function(e) invisible())
 # Fault tolerance:  currently, check each time job completes for failed workers
-        ftcheck(queue)
+        ftcheck(id=queue, restartFaults=restartFaults, verbose=verbose)
         tryCatch(redisDelete(fttag.start), error=function(e) invisible())
         .delOK()
       }
