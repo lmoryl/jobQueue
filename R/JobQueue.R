@@ -114,8 +114,8 @@ JobQueueRedis = setRefClass(
       
       send = function(jobs, ...) {
         if(length(jobs) == 1) jobs=list(jobs)
-        #dots <- list(...)
-        #if(length(dots)) jobs = append(jobs, dots)  
+        dots <- list(...)
+        if(length(dots)) jobs = append(jobs, dots)  
         for(jb in jobs) {
           if(class(jb) == 'Job') {
             jobNumDepends = paste(id, jb$key, 'numWaitingOn', sep=':')
@@ -154,7 +154,7 @@ JobQueueRedis = setRefClass(
         }
       },
      
-      getResults = function(keys = NULL, removeFinished = FALSE, restartFaults = TRUE, verbose=FALSE) {
+      getResults = function(keys = NULL, blocking = FALSE, removeFinished = FALSE, restartFaults = TRUE, verbose=FALSE) {
         # Returns null if key is not done yet.
         queueDone = paste(id, 'done', sep=':')
         if(is.null(keys)) {
@@ -162,14 +162,21 @@ JobQueueRedis = setRefClass(
         }
         keys = unlist(keys)
         queueOut = paste(id, keys, 'out', sep=':')
-        res = lapply(queueOut, redisGet)
+        res = lapply(queueOut, function(i) {
+            if( blocking ) {
+              res = redisBLPop(i)
+            } else {
+              res = redisLPop(i)
+            }
+            if (!removeFinished) {
+              redisRPush(i, res)
+            }
+            res
+          })
         names(res) = keys
         if(length(res) == 1 && is.null(res[[1]])) res<-list()
         if(removeFinished){
-          for( i in seq_along(keys) ) {
-            invisible(redisDelete(queueOut[[i]]))
-            invisible(redisSRem(queueDone, keys[[i]]))
-          }
+          lapply(keys, function(k) invisible(redisSRem(queueDone, k)))
         }
         # Check for failed workers
         ftcheck(id=id, restartFaults=restartFaults, verbose=verbose)
@@ -225,35 +232,44 @@ setMethod(
 #' @export
 setGeneric(
     name = "getResults",
-    def=function(object, keys=NULL){standardGeneric("getResults")}
+    def=function(object, keys=NULL, blocking=FALSE, removeFinished = FALSE, restartFaults = TRUE, verbose=FALSE){standardGeneric("getResults")}
+#    def=function(object, keys=NULL){standardGeneric("getResults")}
 )
 
 setMethod(
   f = "getResults",
   signature = "JobQueue",
-  definition = function(object, keys) object$getResults(keys)
+#  definition = function(object,keys) object$getResults(keys)
+  definition = function(object, keys, blocking, removeFinished, restartFaults, verbose) object$getResults(keys=keys, blocking=blocking, removeFinished=removeFinished, restartFaults=restartFaults, verbose=verbose)
 )
 
 
 # run the jobs in the queue (only needed for some types of job queues)
 #' @export
-if(!isGeneric("run")) setGeneric(
-    name = "run",
-    def=function(object){standardGeneric("run")}
+#if(!isGeneric("run")) setGeneric(
+#    name = "run",
+#    def=function(object){standardGeneric("run")}
+#)
+#
+#setMethod(
+#  f = "run",
+#  signature = "JobQueue",
+#  definition = function(object) {object$run(); object}
+#)
+
+# run the jobs in the queue (only needed for some types of job queues)
+#' @export
+if(!isGeneric("sendJobs")) setGeneric(
+    name = "sendJobs",
+    def=function(queue, jobs, ...){standardGeneric("sendJobs")}
 )
 
 setMethod(
-  f = "run",
+  f = "sendJobs",
   signature = "JobQueue",
-  definition = function(object) {object$run(); object}
+  definition = function(queue, jobs, ...) queue$send(jobs=jobs, ...)
 )
 
-sendJobs = function(queue, jobs) {
-    if(length(jobs) > 0) {
-       if(length(jobs) == 1) jobs = list(jobs)
-       for(j in jobs) queue$send(j)
-    } 
-}
 
 #' @export
 makeJQRedis = function(id = bmuuid(), host="localhost", port=6379,...) {

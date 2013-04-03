@@ -29,7 +29,7 @@
   )
 }
 
-`startLocalJQWorkers` <- function(n, queue, host="localhost", port=6379, iter=Inf, timeout=60, log=stdout(), Rbin=paste(R.home(component='bin'),"R",sep="/"), restartFaults=TRUE, verbose=TRUE)
+`startJQWorkers` <- function(n, queue, host="localhost", port=6379, iter=Inf, timeout=60, log=stdout(), Rbin=paste(R.home(component='bin'),"R",sep="/"), restartFaults=TRUE, verbose=TRUE)
 {
   m <- match.call()
   f <- formals()
@@ -116,7 +116,7 @@
         jobDependees = redisSMembers(jobDependeesKey)
         redisSetBlocking(FALSE)
         redisMulti() #Do all of this atomically
-        redisSet(queueOut, result)
+        redisRPush(queueOut, result)
         redisSRem(queueInProgress, jbkey)
         redisSAdd(queueDone, jbkey)
         for (i in jobDependees) {

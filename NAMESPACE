@@ -21,10 +21,10 @@ export(getWaiting)
 export(getInProgress)
 export(getResults)
 export(makeJQRedis)
-#export(sendJobs)
+export(sendJobs)
 
 export(jqWorker)
-export(startLocalJQWorkers)
+export(startJQWorkers)
 
 import(rredis)
 
