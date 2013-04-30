@@ -23,9 +23,9 @@ If no key is given, the key is a random value returned by the function
 envir can be passed as a list or an environment; if none is specified, it is
 taken from the calling environment.
 }
-\example{
-var1 = 1
+\examples{
+var1 <- 1
 jb <- makeJob(expr=1+var1)
-run(jb)
+runJob(jb)
 }
 

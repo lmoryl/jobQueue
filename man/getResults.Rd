@@ -19,10 +19,6 @@ a finished Job's key and the value is the Job's result.
   \item{restartFaults}{Should any Jobs that caused a worker fault be restarted?}
   \item{verbose}{Print information about faults}
 }
-\author{
-Luke Moryl <lsmoryl@pivotaltargeting.com>
-Peter Foley <pwfoley@pivotaltargeting.com>
-}
 \note{
 JobQueue functions require network access to a Redis server (not
 included with the doRedis package).

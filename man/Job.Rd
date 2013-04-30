@@ -1,5 +1,5 @@
 \name{Job-class}
-\doctype{class}
+\docType{class}
 \alias{Job-class}
 \alias{Job}
 \title{
@@ -25,19 +25,27 @@ computations across multiple machines.
     \item{dependsOn}{A list of keys of Jobs that this Job depends on.  These
       should be jobs that must be complete before expr can be evaluated.}
   }
+}
 \section{Methods}{
   \describe{
-    \item{makeJob}
-    \item{getKey}
-    \item{setKey}
-    \item{getPackages}
-    \item{setPackages}
-    \item{getDependsOn}
-    \item{setDependsOn}
-    \item{getEnvir}
-    \item{setEnvir}
-    \item{sendJobs}
-    \item{run}
+    Each of these has its own help page.
+    \item{\code{\link{makeJob}}}{,}
+    \item{\code{\link{getKey}}}{,}
+    \item{\code{\link{setKey}}}{,}
+    \item{\code{\link{getPackages}}}{,}
+    \item{\code{\link{setPackages}}}{,}
+    \item{\code{\link{getDependsOn}}}{,}
+    \item{\code{\link{setDependsOn}}}{,}
+    \item{\code{\link{getEnvir}}}{,}
+    \item{\code{\link{setEnvir}}}{,}
+    \item{\code{\link{sendJobs}}}{,}
+    \item{\code{\link{run}}}{,}
+  }
+}
+\author{
+  \describe{
+    \item{Luke Moryl}{\email{lsmoryl@pivotaltargeting.com}}
+    \item{Peter Foley}{\email{pwfoley@pivotaltargeting.com}}
   }
 }
 

@@ -9,5 +9,3 @@ getDependsOn(job)
 \arguments{
   \item{job}{A Job object.}
 }
-
-

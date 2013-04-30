@@ -1,5 +1,5 @@
 \name{JobQueue-class}
-\doctype{class}
+\docType{class}
 \alias{JobQueue-class}
 \alias{JobQueue}
 \title{
@@ -27,16 +27,19 @@ getResults is called on the JobQueue.
 }} 
 \section{Methods}{
   \describe{
-    \item{makeJQRedis}
-    \item{sendJobs}
-    \item{getWaiting}
-    \item{getInProgress}
-    \item{getResults}
+    Each of these has its own help page.
+    \item{\code{\link{makeJQRedis}}}{,}
+    \item{\code{\link{endJobs}}}{,}
+    \item{\code{\link{getWaiting}}}{,}
+    \item{\code{\link{getInProgress}}}{,}
+    \item{\code{\link{getResults}}}{,}
   }
 }
 \author{
-Luke Moryl <lsmoryl@pivotaltargeting.com>
-Peter Foley <pwfoley@pivotaltargeting.com>
+  \describe{
+    \item{Luke Moryl}{\email{lsmoryl@pivotaltargeting.com}}
+    \item{Peter Foley}{\email{pwfoley@pivotaltargeting.com}}
+  }
 }
 \note{
 All JobQueue functions require network access to a Redis server (not

@@ -14,4 +14,3 @@ getEnvir(job)
   \item{job}{A Job object.}
 }
 
-

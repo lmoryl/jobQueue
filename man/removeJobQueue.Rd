@@ -24,9 +24,6 @@ Redis keys.
 TRUE is returned if the queues were successfully deleted, FALSE and
 probably an error condition otherwise.
 }
-\author{
-B. W. Lewis <blewis@illposed.net>
-}
 \note{
 JobQueue functions require network access to a Redis server (not
 included with the doRedis package).

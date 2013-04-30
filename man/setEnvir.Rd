@@ -17,7 +17,7 @@ setEnvir(job, env, appendAll=FALSE)
   \item{job}{A Job object.}
   \item{env}{An environment or list of assignments}
   \item{appendAll}{Should the variable assignments be appended to those already
-    in the Job's environment?
+    in the Job's environment?}
 }
 
 

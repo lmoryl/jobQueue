@@ -11,8 +11,4 @@ not.
 \value{
 The generated string
 }
-\author{
-Luke Moryl <lsmoryl@pivotaltargeting.com>
-Peter Foley <pwfoley@pivotaltargeting.com>
-}
 

@@ -50,10 +50,6 @@ is received in the R session.
 Nothing is returned. Set the \code{log} parameter to \code{stdout()} to
 see log messages printed on standard output of the invoking R session.
 }
-\author{
-Luke Moryl <lsmoryl@pivotaltargeting.com>
-Peter Foley <pwfoley@pivotaltargeting.com>
-}
 \note{
 JobQueue functions require network access to a Redis server (not
 included with the doRedis package).

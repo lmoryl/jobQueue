@@ -9,8 +9,8 @@ A non-blocking job queue implementation for R using Redis
     This help page gives an overview of the jobQueue package.  The package
     borrows heavily from the doRedis package by B.W. Lewis.
 
-    The jobQueue package provides an interface to arbitrarily large parallel
-    backends (on a Redis server, not provided) that enables the simultaneous
+    The jobQueue package provides an interface to an arbitrarily large parallel
+    backend (on a Redis server, not provided) that enables the simultaneous
     execution of multiple jobs and the creation of jobs that only run when the
     jobs they depend on are finished.  
 }
@@ -37,13 +37,21 @@ A non-blocking job queue implementation for R using Redis
     see the \code{\link{startJQWorkers}} help file.
 }
 
-\authors{
-    Luke Moryl <lsmoryl@pivotaltargeting.com>,
-    Peter Foley <pwfoley@pivotaltargeting.com>
+\author{
+  \describe{
+    \item{Luke Moryl}{\email{lsmoryl@pivotaltargeting.com}}
+    \item{Peter Foley}{\email{pwfoley@pivotaltargeting.com}}
+  }
 }
 
 \section{jobQueue applications}{
 }
+
+\note{
+  Many of the components of the jobQueue package require network access to a
+  Redis server.  Note that multiple JobQueues and multiple doRedis queues can
+  exist on a single Redis server, provided that the JobQueues have distinct ids
+  and, likewise, that the doRedis queues have distinct queue names.
 
 \examples{
 \dontrun{

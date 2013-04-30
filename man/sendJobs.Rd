@@ -23,10 +23,6 @@ queue.  Returns false and possibly warnings otherwise.
 
 If a job is already in the queue, the user is warned and no action is taken.
 }
-\author{
-Luke Moryl <lsmoryl@pivotaltargeting.com>
-Peter Foley <pwfoley@pivotaltargeting.com>
-}
 \note{
 JobQueue functions require network access to a Redis server (not
 included with the doRedis package).

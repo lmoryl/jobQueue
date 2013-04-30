@@ -41,9 +41,6 @@ or a keyboard interrupt is issued.
 Nothing is returned but status messages are printed to the log
 during operation of the worker loop.
 }
-\author{
-B. W. Lewis <blewis@illposed.net>
-}
 \note{
 All doRedis functions require network access to a Redis server (not
 included with the doRedis package).
